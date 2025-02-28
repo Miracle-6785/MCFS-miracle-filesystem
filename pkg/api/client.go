@@ -17,3 +17,14 @@ func InitGRPCClients() {
 	}
 	NameNodeClient = proto.NewNameNodeServiceClient(nameNodeConn)
 }
+
+func InitDataNodeClient(addr string) proto.DataNodeServiceClient {
+	dataNodeConn, err := grpc.Dial(addr, grpc.WithInsecure())
+	if err != nil {
+		log.Fatalf("Failed to connect to DataNode gRPC server at %s: %v", addr, err)
+	}
+
+	client := proto.NewDataNodeServiceClient(dataNodeConn)
+	log.Printf("Connected to DataNode at %s\n", addr)
+	return client
+}

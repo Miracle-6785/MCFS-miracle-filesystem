@@ -4,11 +4,16 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"slices"
 	"sync"
 	"time"
 
 	"github.com/Miracle-6785/mfs/generate/proto"
 	"github.com/Miracle-6785/mfs/pkg/common"
+	"github.com/Miracle-6785/mfs/pkg/constant"
+	"github.com/google/uuid"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // FileSystemNode represents an entry in the filesystem tree
@@ -36,6 +41,7 @@ type NameNode struct {
 type DataNodeInfo struct {
 	ID          string
 	Address     string
+	Port        string
 	LastSeen    time.Time
 	Capacity    int64
 	Used        int64
@@ -45,7 +51,7 @@ type DataNodeInfo struct {
 func NewNameNode(blockSize int64, replicaFactor int) *NameNode {
 	return &NameNode{
 		root: &FileSystemNode{
-			Name:        "/tmp/mfs",
+			Name:        constant.NODENAME_ROOT_DIR,
 			IsDirectory: true,
 			Children:    make(map[string]*FileSystemNode),
 		},
@@ -62,7 +68,8 @@ func (nn *NameNode) RegisterDataNode(ctx context.Context, req *proto.RegisterDat
 	// Record the DataNode in NameNode's datanodes map
 	nn.dataNodes[req.DatanodeId] = &DataNodeInfo{
 		ID:          req.DatanodeId,
-		Address:     fmt.Sprintf("%s:%s", req.Address.GetIp(), req.Address.GetPort()),
+		Address:     req.Address.GetIp(),
+		Port:        req.Address.GetPort(),
 		LastSeen:    time.Now(),
 		Capacity:    req.StorageInfo.Capacity,
 		Used:        req.StorageInfo.Used,
@@ -161,6 +168,70 @@ func (nn *NameNode) CreateFile(ctx context.Context, req *proto.CreateFileRequest
 		Success: true,
 		Message: "File created successfully",
 	}, nil
+}
+
+// Return all tailor DataNodes for the block
+func (nn *NameNode) AllocateBlock(ctx context.Context, req *proto.AllocateBlockRequest) (*proto.AllocateBlockResponse, error) {
+	nn.mu.Lock()
+	defer nn.mu.Unlock()
+
+	// Find the tailored DataNodes for the block
+	tailoredDataNodes, err := nn.getTailoredDataNodes(req.Size)
+
+	if err != nil {
+		return nil, status.Errorf(codes.ResourceExhausted, "Failed to find DataNodes: %v", err)
+	}
+
+	resNodes := make([]*proto.DataNodeInfo, 0, len(tailoredDataNodes))
+
+	for _, node := range tailoredDataNodes {
+		resNodes = append(resNodes, &proto.DataNodeInfo{
+			DatanodeId: node.ID,
+			Ip:         node.Address,
+			Port:       node.Port,
+		})
+	}
+
+	// Generate a new block ID
+	blockID := uuid.New()
+	return &proto.AllocateBlockResponse{
+		BlockId:   blockID.String(),
+		Datanodes: resNodes,
+	}, nil
+}
+
+func (nn *NameNode) getTailoredDataNodes(demandSize int64) ([]*DataNodeInfo, error) {
+	nodes := make([]*DataNodeInfo, 0, len(nn.dataNodes))
+
+	for _, node := range nn.dataNodes {
+		nodes = append(nodes, node)
+	}
+	// Sort DataNode by their storage utilization
+	slices.SortFunc(nodes, func(a, b *DataNodeInfo) int {
+		// Calculate utilization
+		utilA := float64(a.Used) / float64(a.Capacity)
+		utilB := float64(b.Used) / float64(b.Capacity)
+
+		// Return -1, 0, or 1 for sorting
+		switch {
+		case utilA < utilB:
+			return -1
+		case utilA > utilB:
+			return 1
+		default:
+			return 0
+		}
+	})
+	// Filter out DataNodes that do not have enough space
+	filterNodes := make([]*DataNodeInfo, 0, len(nodes))
+	for _, node := range nodes {
+		if node.Capacity-node.Used >= demandSize {
+			filterNodes = append(filterNodes, node)
+		}
+	}
+
+	// Return the number of DataNodes equal to the replica factor
+	return nodes[:nn.replicaFactor], nil
 }
 
 // traverseToParent navigates the tree to the parent directory node of a path.

@@ -4,11 +4,14 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/Miracle-6785/mfs/generate/proto"
 	"github.com/Miracle-6785/mfs/pkg/common"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type StorageInfo struct {
@@ -39,7 +42,7 @@ func NewDataNode(id, storageDir, nameNodeAddr, port string) (*DataNode, error) {
 
 	storageInfo := &StorageInfo{
 		capacity:   10 * 1024 * 1024 * 1024, // 10GB
-		used:       0,
+		used:       1000,
 		storageDir: storageDir,
 		blockCount: 0,
 	}
@@ -132,4 +135,105 @@ func (dn *DataNode) StartHeartbeat(interval time.Duration) {
 			fmt.Println("⚠️ Heartbeat response received but not successful")
 		}
 	}
+}
+
+func (dn *DataNode) WriteBlock(stream proto.DataNodeService_WriteBlockServer) error {
+	var (
+		file              *os.File
+		blockID           string
+		totalBytesWritten int64
+		opened            bool
+	)
+
+	defer func() {
+		if file != nil {
+			file.Close()
+		}
+	}()
+
+	// 1. Loop over incoming messages
+	for {
+		req, err := stream.Recv()
+		if err != nil {
+			// Client closed the stream, or an error occurred
+			break
+		}
+
+		if err != nil {
+			return status.Errorf(codes.Unknown, "Failed to receive a message: %v", err)
+		}
+
+		switch payload := req.Payload.(type) {
+		case *proto.WriteBlockRequest_Metadata:
+			if opened {
+				// If we already have a file open, something went wrong
+				return stream.SendAndClose(&proto.WriteBlockResponse{
+					Success:      false,
+					ErrorCode:    proto.ErrorCode_UNKNOWN,
+					ErrorMessage: "Received metadata twice for the same block",
+				})
+			}
+
+			blockID = payload.Metadata.BlockId
+			blockSize := payload.Metadata.Size
+
+			fmt.Printf("Received metadata for block %s, size: %d\n", blockID, blockSize)
+
+			// 3. Open a local file for writing
+			path := filepath.Join(dn.StorageInfo.storageDir, blockID)
+			f, err := os.Create(path)
+			if err != nil {
+				return stream.SendAndClose(&proto.WriteBlockResponse{
+					Success:      false,
+					ErrorCode:    proto.ErrorCode_UNKNOWN,
+					ErrorMessage: fmt.Sprintf("Failed to create file: %v", err),
+				})
+			}
+
+			file = f
+			opened = true
+		case *proto.WriteBlockRequest_DataChunk:
+			if !opened {
+				// Data arrived before metadata
+				return stream.SendAndClose(&proto.WriteBlockResponse{
+					Success:      false,
+					ErrorCode:    proto.ErrorCode_UNKNOWN,
+					ErrorMessage: "Received data chunk before metadata",
+				})
+			}
+
+			chunk := payload.DataChunk
+			n, writeErr := file.Write(chunk)
+			if writeErr != nil {
+				return stream.SendAndClose(&proto.WriteBlockResponse{
+					Success:      false,
+					ErrorCode:    proto.ErrorCode_UNKNOWN,
+					ErrorMessage: fmt.Sprintf("Failed to write chunk: %v", writeErr),
+				})
+			}
+
+			totalBytesWritten += int64(n)
+		default:
+			// Unrecognized oneof
+			return stream.SendAndClose(&proto.WriteBlockResponse{
+				Success:      false,
+				ErrorCode:    proto.ErrorCode_UNKNOWN,
+				ErrorMessage: "Unknown payload type",
+			})
+		}
+
+	}
+	// 5. Stream ended normally (client closed the stream)
+	if file != nil {
+		if err := file.Close(); err != nil {
+			return status.Errorf(codes.Unknown, "Failed to close file: %v", err)
+		}
+	}
+
+	// 6. Return final success response
+	return stream.SendAndClose(&proto.WriteBlockResponse{
+		Success:      true,
+		ErrorCode:    proto.ErrorCode_NONE,
+		ErrorMessage: fmt.Sprintf("Wrote %d bytes for block %s", totalBytesWritten, blockID),
+	})
 }

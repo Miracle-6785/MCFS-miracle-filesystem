@@ -67,10 +67,18 @@ message ListDirectoryResponse {
 // Block operations
 message AllocateBlockRequest {
     string file_path = 1;
+    int64 size = 2;
+}
+
+message DataNodeInfo {
+    string datanode_id = 1;
+    string ip = 2;
+    string port = 3;    
 }
 
 message AllocateBlockResponse {
-    BlockInfo block_info = 1;
+    string block_id = 1;
+    repeated DataNodeInfo datanodes = 2;
 }
 
 message GetBlockLocationsRequest {

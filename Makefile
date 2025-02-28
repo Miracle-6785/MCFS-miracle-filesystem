@@ -3,14 +3,14 @@ BINARY_NAME=bin/mfs
 API_BINARY_NAME=bin/api
 GO_FILES=$(shell find . -type f -name '*.go' -not -path "./vendor/*")
 
-.PHONY: all build api-build run api-run test clean fmt lint
+.PHONY: all build api-build run api-run test clean fmt lint generate
 
 # Default target
 all: build
 
 generate:
 	@echo "Generating protobuf..."
-	@protoc --go_out=. --go-grpc_out=. pkg/proto/*.proto
+	@rm -rf generate && protoc --go_out=. --go-grpc_out=. pkg/proto/*.proto
 
 # Build the main MFS binary
 build:
