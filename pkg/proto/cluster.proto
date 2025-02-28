@@ -1,0 +1,52 @@
+syntax = "proto3";
+package proto;
+
+import "pkg/proto/name_node.proto";
+option go_package = "generate/proto";
+
+message Address {
+    string ip = 1;
+    string port = 2;
+}
+
+message StorageInfo {
+    int64 capacity = 1;
+    int64 used = 2;
+}
+
+// DataNode registration and heartbeat service
+message RegisterDataNodeRequest {
+    string datanode_id = 1;
+    Address address = 2;
+    StorageInfo storage_info = 3;
+}
+
+message RegisterDataNodeResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+message HeartbeatRequest {
+    string datanode_id = 1;
+    StorageInfo storage_info = 2;
+}
+
+message HeartbeatResponse {
+    bool success = 1;
+}
+
+message BlockReportRequest {
+    string datanode_id = 1;
+    repeated BlockInfo blocks = 2;
+}
+
+message BlockReportResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+service DataNodeRegistryService {
+    rpc RegisterDataNode(RegisterDataNodeRequest) returns (RegisterDataNodeResponse);
+    rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+    rpc BlockReport(BlockReportRequest) returns (BlockReportResponse);
+}

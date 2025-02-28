@@ -1,0 +1,71 @@
+syntax = "proto3";
+package proto;
+
+option go_package = "generate/proto";
+
+enum ErrorCode {
+    NONE = 0;
+    NOT_FOUND = 1;
+    PERMISSION_DENIED = 2;
+    DISK_FULL = 3;
+    UNKNOWN = 100;
+}
+
+// DataNode service for data operations
+service DataNodeService {
+    // Block operations
+    rpc WriteBlock(stream WriteBlockRequest) returns (WriteBlockResponse);
+    rpc ReadBlock(ReadBlockRequest) returns (stream ReadBlockResponse);
+    rpc ReplicateBlock(ReplicateBlockRequest) returns (ReplicateBlockResponse);
+    rpc DeleteBlock(DeleteBlockRequest) returns (DeleteBlockResponse);
+}
+
+message WriteBlockRequest {
+    oneof payload {
+      // The first message might contain metadata
+      BlockMetadata metadata = 1;
+  
+      // Subsequent messages might contain raw data
+      bytes data_chunk = 2;
+    }
+  }
+
+message BlockMetadata {
+    string block_id = 1;
+    int64 size = 2;
+}
+
+message WriteBlockResponse {
+    bool success = 1;
+    ErrorCode error_code = 2;
+    string error_message = 3;
+}
+
+message ReadBlockRequest {
+    string block_id = 1;
+    int64 offset = 2;
+    int64 length = 3;
+}
+
+message ReadBlockResponse {
+    bytes data_chunk = 1;
+  }
+
+message ReplicateBlockRequest {
+    string block_id = 1;
+    repeated string target_datanode_ids = 2;
+}
+
+message ReplicateBlockResponse {
+    bool success = 1;
+    string error = 2;
+}
+
+message DeleteBlockRequest {
+    string block_id = 1;
+}
+
+message DeleteBlockResponse {
+    bool success = 1;
+    string error = 2;
+}

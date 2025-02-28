@@ -1,0 +1,95 @@
+syntax = "proto3";
+package proto;
+
+option go_package = "generate/proto";
+
+// File metadata
+message FileInfo {
+    string name = 1;
+    int64 size = 2;
+    bool is_directory = 3;
+    int64 modified_time = 4;
+    repeated BlockInfo blocks = 5;
+}
+
+// Block information
+message BlockInfo {
+    string block_id = 1;
+    int64 size = 2;
+    repeated string datanode_ids = 3; // Nodes storing this block
+}
+
+// File operations
+message CreateFileRequest {
+    string path = 1;
+}
+
+message CreateFileResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+message GetFileInfoRequest {
+    string path = 1;
+}
+
+message GetFileInfoResponse {
+    FileInfo file_info = 1;
+}
+
+message DeleteFileRequest {
+    string path = 1;
+}
+
+message DeleteFileResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+// Directory operations
+message MakeDirectoryRequest {
+    string path = 1;
+}
+
+message MakeDirectoryResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+message ListDirectoryRequest {
+    string path = 1;
+}
+
+message ListDirectoryResponse {
+    repeated FileInfo files = 1;
+}
+
+// Block operations
+message AllocateBlockRequest {
+    string file_path = 1;
+}
+
+message AllocateBlockResponse {
+    BlockInfo block_info = 1;
+}
+
+message GetBlockLocationsRequest {
+    string block_id = 1;
+}
+
+message GetBlockLocationsResponse {
+    repeated string datanode_ids = 1;
+}
+
+// NameNode service for client operations
+service NameNodeService {
+    rpc CreateFile(CreateFileRequest) returns (CreateFileResponse);
+    rpc GetFileInfo(GetFileInfoRequest) returns (GetFileInfoResponse);
+    rpc DeleteFile(DeleteFileRequest) returns (DeleteFileResponse);
+
+    rpc MakeDirectory(MakeDirectoryRequest) returns (MakeDirectoryResponse);
+    rpc ListDirectory(ListDirectoryRequest) returns (ListDirectoryResponse);
+
+    rpc AllocateBlock(AllocateBlockRequest) returns (AllocateBlockResponse);
+    rpc GetBlockLocations(GetBlockLocationsRequest) returns (GetBlockLocationsResponse);
+}
