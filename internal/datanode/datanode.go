@@ -230,6 +230,8 @@ func (dn *DataNode) WriteBlock(stream proto.DataNodeService_WriteBlockServer) er
 		}
 	}
 
+	fmt.Printf("Wrote %d bytes for block %s\n", totalBytesWritten, blockID)
+
 	// 6. Return final success response
 	return stream.SendAndClose(&proto.WriteBlockResponse{
 		Success:      true,

@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/Miracle-6785/mfs/generate/proto"
-	"github.com/Miracle-6785/mfs/pkg/constant"
-	"github.com/Miracle-6785/mfs/pkg/datanode"
-	"github.com/Miracle-6785/mfs/pkg/namenode"
+	"github.com/Miracle-6785/mfs/internal/config"
+	"github.com/Miracle-6785/mfs/internal/datanode"
+	"github.com/Miracle-6785/mfs/internal/namenode"
 	"google.golang.org/grpc"
 )
 
@@ -43,7 +43,7 @@ func startNameNode(addr string) error {
 	server := grpc.NewServer()
 
 	// Create a NameNode instance
-	nn := namenode.NewNameNode(constant.BLOCK_SIZE, 1)
+	nn := namenode.NewNameNode(config.BLOCK_SIZE, 1)
 
 	// Register the NameNodeService
 	proto.RegisterNameNodeServiceServer(server, nn)

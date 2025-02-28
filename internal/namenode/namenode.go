@@ -9,8 +9,9 @@ import (
 	"time"
 
 	"github.com/Miracle-6785/mfs/generate/proto"
+	"github.com/Miracle-6785/mfs/internal/config"
 	"github.com/Miracle-6785/mfs/pkg/common"
-	"github.com/Miracle-6785/mfs/pkg/constant"
+
 	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -51,7 +52,7 @@ type DataNodeInfo struct {
 func NewNameNode(blockSize int64, replicaFactor int) *NameNode {
 	return &NameNode{
 		root: &FileSystemNode{
-			Name:        constant.NODENAME_ROOT_DIR,
+			Name:        config.NODENAME_ROOT_DIR,
 			IsDirectory: true,
 			Children:    make(map[string]*FileSystemNode),
 		},

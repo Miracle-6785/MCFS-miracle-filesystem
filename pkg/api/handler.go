@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	"github.com/Miracle-6785/mfs/generate/proto"
-	"github.com/Miracle-6785/mfs/pkg/constant"
+	"github.com/Miracle-6785/mfs/internal/config"
 	"github.com/gin-gonic/gin"
 )
 
@@ -48,7 +48,7 @@ func UploadFileHandler(c *gin.Context) {
 	}
 
 	// 4. Chunk the file (64MB per chunk here; pick your block size)
-	blockSize := int64(constant.BLOCK_SIZE) // 64MB
+	blockSize := int64(config.BLOCK_SIZE) // 64MB
 	err = uploadFileInChunks(uploadedFile, blockSize, dfsFilePath)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
